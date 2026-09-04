@@ -214,6 +214,89 @@ class MagicBolt:
         pygame.draw.circle(surface, col, (int(self.x), int(self.y)), 6)
         pygame.draw.circle(surface, COLOR_WHITE, (int(self.x), int(self.y)), 3)
 
+class AlchemistPotion:
+    def __init__(self, x, y, target, damage, armor_shred=0.20, is_plague=False, is_acid=False):
+        self.x = float(x)
+        self.y = float(y)
+        self.target = target
+        self.damage = damage
+        self.armor_shred = armor_shred
+        self.is_plague = is_plague
+        self.is_acid = is_acid
+        self.speed = 340.0
+        self.alive = True
+        self.target_pos = (target.x, target.y) if target and target.alive else (x, y)
+        self.angle = 0.0
+
+    def update(self, dt, enemies, particle_sys):
+        if not self.alive:
+            return
+        if self.target and self.target.alive:
+            self.target_pos = (self.target.x, self.target.y)
+        dx = self.target_pos[0] - self.x
+        dy = self.target_pos[1] - self.y
+        dist = math.hypot(dx, dy)
+        self.angle += dt * 15.0
+        step = self.speed * dt
+        if dist <= step or dist < 12:
+            self.alive = False
+            sound_manager.play("acid_splash")
+            splash_rad = 55 if self.is_plague else 40
+            liquid_col = (140, 50, 210) if self.is_plague else (60, 240, 80)
+            particle_sys.add_magic_burst(self.target_pos[0], self.target_pos[1], liquid_col, count=10)
+            for e in enemies:
+                if e.alive and math.hypot(e.x - self.target_pos[0], e.y - self.target_pos[1]) <= splash_rad:
+                    dmg = e.take_damage(self.damage, "magic")
+                    e.armor = max(0.0, e.armor - self.armor_shred)
+                    e.apply_slow(0.35, 2.5)
+                    if self.is_plague:
+                        e.apply_poison(22, 4.0)
+                    if self.is_acid:
+                        e.apply_burn(30, 3.0)
+                    particle_sys.add_floating_damage(e.x, e.y, dmg, "magic")
+        else:
+            self.x += (dx / dist) * step
+            self.y += (dy / dist) * step
+
+    def draw(self, surface):
+        if not self.alive:
+            return
+        col = (140, 50, 210) if self.is_plague else (60, 240, 80)
+        pygame.draw.circle(surface, (230, 210, 180), (int(self.x), int(self.y - 4)), 3)
+        pygame.draw.circle(surface, col, (int(self.x), int(self.y)), 6)
+        pygame.draw.circle(surface, (200, 255, 180), (int(self.x), int(self.y)), 2)
+
+class SunBeamEffect:
+    def __init__(self, x1, y1, target, damage, is_divine=False):
+        self.x1 = float(x1)
+        self.y1 = float(y1)
+        self.target = target
+        self.damage = damage
+        self.is_divine = is_divine
+        self.alive = True
+        self.timer = 0.20
+
+    def update(self, dt, enemies, particle_sys):
+        if not self.alive:
+            return
+        self.timer -= dt
+        if self.timer <= 0 or not self.target or not self.target.alive:
+            self.alive = False
+            return
+        dmg = self.target.take_damage(self.damage * dt * 2.0, "magic")
+        if self.timer > 0.16:
+            sound_manager.play("sun_beam")
+            particle_sys.add_hit_spark(self.target.x, self.target.y, (255, 240, 100), count=2)
+
+    def draw(self, surface):
+        if not self.alive or not self.target:
+            return
+        beam_width = 5 if self.is_divine else 3
+        glow_color = (255, 240, 150) if not self.is_divine else (255, 160, 40)
+        pygame.draw.line(surface, glow_color, (int(self.x1), int(self.y1)), (int(self.target.x), int(self.target.y)), beam_width + 4)
+        pygame.draw.line(surface, COLOR_WHITE, (int(self.x1), int(self.y1)), (int(self.target.x), int(self.target.y)), beam_width)
+        pygame.draw.circle(surface, COLOR_GOLD_LIGHT, (int(self.target.x), int(self.target.y)), 6)
+
 # ------------------ CLASE BASE DE TORRE ------------------
 
 class Tower:
@@ -285,6 +368,15 @@ class Tower:
                     self.damage = data["l2_damage"]
                     self.range = data["l2_range"]
                     self.fire_rate = data["l2_fire_rate"]
+                elif self.tower_type == "alchemist":
+                    self.damage = data["l2_damage"]
+                    self.range = data["l2_range"]
+                    self.fire_rate = data["l2_fire_rate"]
+                    self.armor_shred = data["l2_armor_shred"]
+                elif self.tower_type == "sun_shrine":
+                    self.damage = data["l2_damage"]
+                    self.range = data["l2_range"]
+                    self.fire_rate = data["l2_fire_rate"]
                 elif self.tower_type == "barracks":
                     for s in self.soldiers:
                         s.max_hp = data["l2_hp"]
@@ -307,6 +399,15 @@ class Tower:
                     self.range = data["l3_range"]
                     self.splash_radius = data["l3_splash"]
                 elif self.tower_type == "mage":
+                    self.damage = data["l3_damage"]
+                    self.range = data["l3_range"]
+                    self.fire_rate = data["l3_fire_rate"]
+                elif self.tower_type == "alchemist":
+                    self.damage = data["l3_damage"]
+                    self.range = data["l3_range"]
+                    self.fire_rate = data["l3_fire_rate"]
+                    self.armor_shred = data["l3_armor_shred"]
+                elif self.tower_type == "sun_shrine":
                     self.damage = data["l3_damage"]
                     self.range = data["l3_range"]
                     self.fire_rate = data["l3_fire_rate"]
@@ -340,6 +441,17 @@ class Tower:
                 self.damage = data["damage"]
                 self.range = data["range"]
                 self.fire_rate = data["fire_rate"]
+            elif self.tower_type == "alchemist":
+                self.damage = data["damage"]
+                self.range = data["range"]
+                self.fire_rate = data["fire_rate"]
+                self.armor_shred = data.get("armor_shred", 0.60)
+            elif self.tower_type == "sun_shrine":
+                self.damage = data["damage"]
+                self.range = data["range"]
+                self.fire_rate = data["fire_rate"]
+                if spec_key == "special_b":
+                    self.buff_radius = data.get("buff_radius", 150)
             elif self.tower_type == "barracks":
                 stype = "paladin" if spec_key == "special_a" else "barbarian"
                 for s in self.soldiers:
@@ -390,7 +502,6 @@ class Tower:
 
         # Actualizar soldados si es cuartel
         if self.tower_type == "barracks":
-            # Reaparición de soldados caídos
             dead_count = sum(1 for s in self.soldiers if not s.alive)
             if dead_count > 0:
                 self.respawn_timer += dt
@@ -407,7 +518,7 @@ class Tower:
                 s.update(dt, enemies, particle_sys)
             return
 
-        # Torres de ataque (Arqueros, Catapulta, Mago)
+        # Torres de ataque
         self.cooldown -= dt
         if self.cooldown <= 0:
             target = self.get_target(enemies)
@@ -422,12 +533,10 @@ class Tower:
             dmg = self.damage
             poison = None
             if self.specialization == "special_a":
-                # Ballesta con críticos
                 if random.random() < 0.35:
                     is_crit = True
                     dmg *= 2.5
             elif self.specialization == "special_b":
-                # Veneno élfico
                 poison = (8, 3.0)
             projectiles_list.append(Arrow(self.x, self.y - 16, target, dmg, self.damage_type, is_crit, poison))
 
@@ -435,7 +544,6 @@ class Tower:
             is_fire = (self.specialization == "special_a")
             is_stun = (self.specialization == "special_b")
             burn_info = (25, 4.0) if is_fire else None
-            # Predecir ligeramente la posición del objetivo
             pred_x = target.x + (target.target_x - target.x) * 0.3
             pred_y = target.y + (target.target_y - target.y) * 0.3
             projectiles_list.append(CatapultRock(self.x, self.y - 12, pred_x, pred_y, self.damage, self.splash_radius, is_fire, is_stun, burn_info))
@@ -445,6 +553,16 @@ class Tower:
             is_chain = (self.specialization == "special_b")
             chain_count = 4 if is_chain else 0
             projectiles_list.append(MagicBolt(self.x, self.y - 20, target, self.damage, is_frost, is_chain, chain_count))
+
+        elif self.tower_type == "alchemist":
+            is_plag = (self.specialization == "special_a")
+            is_acid = (self.specialization == "special_b")
+            shred = getattr(self, "armor_shred", 0.20)
+            projectiles_list.append(AlchemistPotion(self.x, self.y - 14, target, self.damage, shred, is_plague=is_plag, is_acid=is_acid))
+
+        elif self.tower_type == "sun_shrine":
+            is_div = (self.specialization == "special_a")
+            projectiles_list.append(SunBeamEffect(self.x, self.y - 22, target, self.damage, is_divine=is_div))
 
     def draw(self, surface):
         # Dibujar torre

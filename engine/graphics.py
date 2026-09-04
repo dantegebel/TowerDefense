@@ -141,6 +141,34 @@ class GraphicsEngine:
                 pygame.draw.rect(surf, COLOR_ROYAL_BLUE, (cx - 4, cy - 12, 8, 7))
                 pygame.draw.line(surf, COLOR_GOLD, (cx - 4, cy - 12), (cx + 4, cy - 12), 2)
 
+        elif tower_type == "alchemist":
+            # Caldero alquímico y tuberías de latón
+            self.draw_stone_brick(surf, (cx - 16, cy - 10, 32, 18), (50, 45, 40), (80, 70, 60))
+            # Caldero de cobre/bronce
+            pygame.draw.ellipse(surf, (140, 85, 40), (cx - 14, cy - 18, 28, 16))
+            liquid_col = (140, 40, 200) if specialization == "special_a" else (60, 240, 80)
+            pygame.draw.ellipse(surf, liquid_col, (cx - 10, cy - 16, 20, 10))
+            # Burbujas
+            b_bob = math.sin(animation_time * 6) * 3
+            pygame.draw.circle(surf, (180, 255, 140), (cx - 4, int(cy - 20 + b_bob)), 3)
+            pygame.draw.circle(surf, (180, 255, 140), (cx + 4, int(cy - 22 - b_bob)), 2)
+            # Matraz / Tubo de destilación
+            pygame.draw.rect(surf, (180, 130, 60), (cx + 9, cy - 22, 5, 14), border_radius=2)
+
+        elif tower_type == "sun_shrine":
+            # Obelisco solar dorado y mármol blanco
+            self.draw_stone_brick(surf, (cx - 12, cy - 12, 24, 20), (180, 160, 120), (240, 235, 220))
+            # Pilares de mármol
+            pygame.draw.rect(surf, COLOR_WHITE, (cx - 14, cy - 24, 6, 22), border_radius=2)
+            pygame.draw.rect(surf, COLOR_WHITE, (cx + 8, cy - 24, 6, 22), border_radius=2)
+            # Frontispicio dorado
+            pygame.draw.polygon(surf, COLOR_GOLD, [(cx, cy - 30), (cx - 16, cy - 24), (cx + 16, cy - 24)])
+            # Sol brillante central
+            s_pulse = math.sin(animation_time * 5) * 2
+            sun_glow = (255, 235, 120) if specialization != "special_a" else (255, 120, 40)
+            pygame.draw.circle(surf, sun_glow, (cx, cy - 16), int(7 + s_pulse), 1)
+            pygame.draw.circle(surf, COLOR_GOLD_LIGHT, (cx, cy - 16), 5)
+
         self.cached_sprites[key] = surf
         return surf
 
@@ -233,6 +261,41 @@ class GraphicsEngine:
             # Ojos brillantes
             pygame.draw.circle(surf, COLOR_ICE_CYAN, (cx - 4, cy - 6 + bob), 2)
             pygame.draw.circle(surf, COLOR_ICE_CYAN, (cx + 4, cy - 6 + bob), 2)
+
+        elif enemy_type == "troll":
+            # Troll gigante de las cavernas con piel musgosa y gran garrote
+            pygame.draw.circle(surf, (60, 115, 75), (cx, cy - 5 + bob), 11) # Cabeza maciza
+            # Colmillos inferiores
+            pygame.draw.polygon(surf, (240, 240, 220), [(cx - 4, cy - 2 + bob), (cx - 2, cy - 7 + bob), (cx - 1, cy - 2 + bob)])
+            pygame.draw.polygon(surf, (240, 240, 220), [(cx + 4, cy - 2 + bob), (cx + 2, cy - 7 + bob), (cx + 1, cy - 2 + bob)])
+            # Ojos amarillos brillantes
+            pygame.draw.circle(surf, (240, 210, 40), (cx - 3, cy - 6 + bob), 2)
+            pygame.draw.circle(surf, (240, 210, 40), (cx + 3, cy - 6 + bob), 2)
+            # Torso jorobado con musgo
+            pygame.draw.rect(surf, (50, 95, 60), (cx - 12, cy + 2 + bob, 24, 15), border_radius=4)
+            pygame.draw.circle(surf, (35, 75, 45), (cx - 6, cy + 4 + bob), 4) # Hongo/musgo
+            pygame.draw.circle(surf, (35, 75, 45), (cx + 5, cy + 7 + bob), 3)
+            # Gran garrote de madera y roca con púas
+            pygame.draw.line(surf, COLOR_WOOD_DARK, (cx + 8, cy + 15 + bob), (cx + 16, cy - 10 + bob), 4)
+            pygame.draw.circle(surf, COLOR_STONE_DARK, (cx + 16, cy - 10 + bob), 6)
+
+        elif enemy_type == "wyvern":
+            # Guiverno alado morado oscuro con alas batientes
+            w_flap = math.sin(walk_cycle * math.pi * 3) * 7
+            wing_l = [(cx - 5, cy - 2), (cx - 20, cy - 14 + int(w_flap)), (cx - 6, cy + 6)]
+            wing_r = [(cx + 5, cy - 2), (cx + 20, cy - 14 + int(w_flap)), (cx + 6, cy + 6)]
+            pygame.draw.polygon(surf, (110, 35, 130), wing_l)
+            pygame.draw.polygon(surf, (110, 35, 130), wing_r)
+            pygame.draw.polygon(surf, (160, 60, 190), wing_l, 1)
+            pygame.draw.polygon(surf, (160, 60, 190), wing_r, 1)
+            # Cuerpo esbelto y cola con aguijón
+            pygame.draw.ellipse(surf, (135, 45, 155), (cx - 7, cy - 5, 14, 16))
+            pygame.draw.line(surf, (135, 45, 155), (cx, cy + 8), (cx + int(math.sin(walk_cycle*4)*5), cy + 18), 3)
+            pygame.draw.polygon(surf, (210, 80, 230), [(cx, cy + 18), (cx - 4, cy + 14), (cx + 4, cy + 14)])
+            # Cabeza rapaz y ojos ámbar
+            pygame.draw.polygon(surf, (150, 50, 175), [(cx, cy - 14), (cx - 5, cy - 6), (cx + 5, cy - 6)])
+            pygame.draw.circle(surf, (255, 190, 30), (cx - 2, cy - 9), 2)
+            pygame.draw.circle(surf, (255, 190, 30), (cx + 2, cy - 9), 2)
 
         elif enemy_type == "dragon_boss":
             # Dragón con alas batientes
@@ -332,5 +395,81 @@ class GraphicsEngine:
         self.cached_sprites["castle"] = surf
         return surf
 
-# Instancia singleton
+    # ------------------ ICONOS VECTORIALES PROCEDURALES (SIN EMOJIS) ------------------
+
+    def draw_star(self, surface, cx, cy, radius=10, filled=True, color=COLOR_GOLD):
+        """Dibuja una estrella de 5 puntas dorada (llena o vacía)."""
+        pts = []
+        r_inner = radius * 0.42
+        for i in range(10):
+            ang = i * (math.pi / 5) - math.pi / 2
+            r = radius if (i % 2 == 0) else r_inner
+            pts.append((cx + math.cos(ang) * r, cy + math.sin(ang) * r))
+        if filled:
+            pygame.draw.polygon(surface, color, pts)
+            pygame.draw.polygon(surface, COLOR_GOLD_LIGHT, pts, 1)
+        else:
+            pygame.draw.polygon(surface, (36, 32, 46), pts)
+            pygame.draw.polygon(surface, (85, 78, 98), pts, 1)
+
+    def draw_speaker(self, surface, cx, cy, enabled=True, color=COLOR_WHITE):
+        """Dibuja un altavoz vectorial medieval limpio."""
+        rx, ry = cx - 7, cy - 4
+        pygame.draw.rect(surface, color, (rx, ry, 4, 8))
+        cone = [(cx - 3, cy - 4), (cx + 2, cy - 8), (cx + 2, cy + 8), (cx - 3, cy + 4)]
+        pygame.draw.polygon(surface, color, cone)
+        if enabled:
+            # Ondas de audio
+            pygame.draw.arc(surface, color, (cx + 1, cy - 6, 6, 12), -math.pi/3, math.pi/3, 2)
+            pygame.draw.arc(surface, color, (cx + 3, cy - 10, 9, 20), -math.pi/3, math.pi/3, 2)
+        else:
+            # Barra diagonal de silenciado
+            pygame.draw.line(surface, (255, 70, 70), (cx - 7, cy - 7), (cx + 8, cy + 7), 2)
+
+    def draw_arrow(self, surface, cx, cy, direction="right", color=COLOR_GOLD_LIGHT, size=9):
+        """Dibuja una flecha triangular perfecta."""
+        if direction == "left":
+            pts = [(cx + size * 0.55, cy - size), (cx - size * 0.65, cy), (cx + size * 0.55, cy + size)]
+        else:
+            pts = [(cx - size * 0.55, cy - size), (cx + size * 0.65, cy), (cx - size * 0.55, cy + size)]
+        pygame.draw.polygon(surface, color, pts)
+
+    def draw_heart(self, surface, cx, cy, size=13, color=(255, 70, 85)):
+        """Dibuja un corazón carmesí limpio para vidas."""
+        r = size / 3.2
+        pygame.draw.circle(surface, color, (int(cx - r), int(cy - r * 0.3)), int(r))
+        pygame.draw.circle(surface, color, (int(cx + r), int(cy - r * 0.3)), int(r))
+        pts = [(cx - size * 0.56, cy - r * 0.3), (cx + size * 0.56, cy - r * 0.3), (cx, cy + size * 0.6)]
+        pygame.draw.polygon(surface, color, pts)
+
+    def draw_coin(self, surface, cx, cy, radius=7):
+        """Dibuja una moneda de oro brillante."""
+        pygame.draw.circle(surface, (240, 190, 45), (int(cx), int(cy)), radius)
+        pygame.draw.circle(surface, (255, 240, 140), (int(cx), int(cy)), radius, 1)
+        pygame.draw.circle(surface, (190, 140, 25), (int(cx), int(cy)), max(2, radius - 3), 1)
+
+    def draw_pause_play(self, surface, cx, cy, is_paused=False, color=COLOR_GOLD_LIGHT, size=7):
+        """Dibuja el icono de pausa o reanudación."""
+        if not is_paused:
+            w, h = 3, int(size * 1.5)
+            pygame.draw.rect(surface, color, (cx - w - 2, cy - h // 2, w, h), border_radius=1)
+            pygame.draw.rect(surface, color, (cx + 2, cy - h // 2, w, h), border_radius=1)
+        else:
+            pts = [(cx - size * 0.55, cy - size), (cx + size * 0.75, cy), (cx - size * 0.55, cy + size)]
+            pygame.draw.polygon(surface, color, pts)
+
+    def draw_flag(self, surface, cx, cy, color=COLOR_WHITE, size=8):
+        """Dibuja una bandera de rally."""
+        pygame.draw.line(surface, (200, 180, 130), (cx - 2, cy - size), (cx - 2, cy + size), 2)
+        pts = [(cx - 2, cy - size), (cx + size, cy - size * 0.4), (cx - 2, cy + size * 0.2)]
+        pygame.draw.polygon(surface, (230, 50, 60), pts)
+
+    def draw_swords(self, surface, cx, cy, size=12, color=COLOR_GOLD_LIGHT):
+        """Dibuja espadas cruzadas medievales ornamentales."""
+        # Hoja 1 (\)
+        pygame.draw.line(surface, color, (cx - size, cy - size), (cx + size, cy + size), 2)
+        pygame.draw.line(surface, COLOR_STONE_LIGHT, (cx - size + 4, cy - size + 8), (cx - size + 8, cy - size + 4), 2)
+        # Hoja 2 (/)
+        pygame.draw.line(surface, color, (cx + size, cy - size), (cx - size, cy + size), 2)
+        pygame.draw.line(surface, COLOR_STONE_LIGHT, (cx + size - 4, cy - size + 8), (cx + size - 8, cy - size + 4), 2)
 gfx = GraphicsEngine()

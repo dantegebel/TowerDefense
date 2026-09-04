@@ -25,9 +25,21 @@ class Game:
         pygame.init()
         pygame.display.set_caption(TITLE)
         
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        # Inicializar audio de manera segura
+        sound_manager.ensure_initialized()
+
+        self.virtual_width = SCREEN_WIDTH
+        self.virtual_height = SCREEN_HEIGHT
+        self.virtual_screen = pygame.Surface((self.virtual_width, self.virtual_height))
+        
+        self.fullscreen = False
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
         self.running = True
+        
+        # Monkey-patch pygame.mouse.get_pos para soporte transparente de escalado en todas las escenas
+        self._orig_mouse_get_pos = pygame.mouse.get_pos
+        pygame.mouse.get_pos = self.get_virtual_mouse_pos
         
         self.progress_data = self._load_progress()
         self.current_scene = None
@@ -36,18 +48,38 @@ class Game:
         # Establecer escena inicial de menú
         self.set_menu_scene()
 
+    def get_viewport_transform(self):
+        win_w, win_h = self.screen.get_size()
+        scale = min(win_w / self.virtual_width, win_h / self.virtual_height)
+        render_w = int(self.virtual_width * scale)
+        render_h = int(self.virtual_height * scale)
+        offset_x = (win_w - render_w) // 2
+        offset_y = (win_h - render_h) // 2
+        return scale, offset_x, offset_y, render_w, render_h
+
+    def to_virtual_coords(self, physical_pos):
+        scale, offset_x, offset_y, _, _ = self.get_viewport_transform()
+        if scale <= 0:
+            return physical_pos
+        px, py = physical_pos
+        vx = (px - offset_x) / scale
+        vy = (py - offset_y) / scale
+        return int(max(0, min(self.virtual_width, vx))), int(max(0, min(self.virtual_height, vy)))
+
+    def get_virtual_mouse_pos(self):
+        raw_pos = self._orig_mouse_get_pos()
+        return self.to_virtual_coords(raw_pos)
+
     def _load_progress(self):
+        prog = {f"level_{lvl['id']}": {"stars": 0, "score": 0} for lvl in LEVELS}
         if os.path.exists(SAVE_FILE):
             try:
                 with open(SAVE_FILE, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    prog.update(data)
             except Exception:
                 pass
-        return {
-            "level_1": {"stars": 0, "score": 0},
-            "level_2": {"stars": 0, "score": 0},
-            "level_3": {"stars": 0, "score": 0}
-        }
+        return prog
 
     def _save_progress(self):
         try:
@@ -101,19 +133,44 @@ class Game:
     def run(self):
         while self.running:
             dt = self.clock.tick(FPS) / 1000.0
-            # Limitar dt máximo para evitar saltos enormes por lag
             dt = min(dt, 0.1)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
+                elif event.type == pygame.VIDEORESIZE:
+                    if not self.fullscreen:
+                        self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                    self.fullscreen = not self.fullscreen
+                    if self.fullscreen:
+                        self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                    else:
+                        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
                 else:
+                    # Mapear coordenadas de ratón al canvas virtual
+                    if hasattr(event, "pos"):
+                        vx, vy = self.to_virtual_coords(event.pos)
+                        event.dict["pos"] = (vx, vy)
+                        # También asignar atributo si el evento lo expone
+                        try:
+                            event.pos = (vx, vy)
+                        except AttributeError:
+                            pass
+                    
                     if self.current_scene:
                         self.current_scene.handle_event(event)
 
+            # Actualizar y dibujar en el canvas virtual
             if self.current_scene:
                 self.current_scene.update(dt)
-                self.current_scene.draw(self.screen)
+                self.current_scene.draw(self.virtual_screen)
+
+            # Escalar y presentar en pantalla con bandas negras (letterboxing)
+            scale, offset_x, offset_y, render_w, render_h = self.get_viewport_transform()
+            self.screen.fill(COLOR_BG_DARK)
+            scaled_surf = pygame.transform.smoothscale(self.virtual_screen, (render_w, render_h))
+            self.screen.blit(scaled_surf, (offset_x, offset_y))
 
             pygame.display.flip()
 

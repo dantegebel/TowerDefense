@@ -10,6 +10,8 @@ from config import (
     COLOR_WHITE, COLOR_STONE_LIGHT
 )
 from engine.audio import sound_manager
+from engine.graphics import gfx
+from maps.levels import LEVELS
 
 class GameOverScene:
     def __init__(self, victory, lives_left, max_lives, score, enemies_killed, level_data, on_next_level_cb, on_retry_cb, on_menu_cb):
@@ -49,7 +51,7 @@ class GameOverScene:
             btn_w, btn_h = 180, 48
             btn_y = SCREEN_HEIGHT // 2 + 155
             
-            if self.victory and self.level_data["id"] < 3:
+            if self.victory and self.level_data["id"] < len(LEVELS):
                 # 3 Botones: Menú, Reintentar, Siguiente Nivel
                 b1 = pygame.Rect(SCREEN_WIDTH // 2 - 290, btn_y, btn_w, btn_h)
                 b2 = pygame.Rect(SCREEN_WIDTH // 2 - 90, btn_y, btn_w, btn_h)
@@ -98,20 +100,27 @@ class GameOverScene:
         # Título
         bob = math.sin(self.anim_time * 3.0) * 3
         if self.victory:
-            t_str = "👑  ¡VICTORIA REAL!  👑"
+            t_str = "¡VICTORIA REAL!"
             t_col = COLOR_GOLD_LIGHT
         else:
-            t_str = "💀  ¡EL REINO HA CAÍDO!  💀"
+            t_str = "¡EL REINO HA CAÍDO!"
             t_col = COLOR_ROYAL_RED
             
         t_surf = self.font_title.render(t_str, True, t_col)
-        surface.blit(t_surf, (px + pw // 2 - t_surf.get_width() // 2, py + 30 + int(bob)))
+        tx = px + pw // 2 - t_surf.get_width() // 2
+        ty = py + 30 + int(bob)
+        surface.blit(t_surf, (tx, ty))
 
-        # Estrellas de Victoria
         if self.victory:
-            stars_str = "⭐" * self.stars + "☆" * (3 - self.stars)
-            stars_surf = self.font_title.render(stars_str, True, COLOR_GOLD)
-            surface.blit(stars_surf, (px + pw // 2 - stars_surf.get_width() // 2, py + 95))
+            gfx.draw_swords(surface, tx - 28, ty + t_surf.get_height() // 2, 14, COLOR_GOLD_LIGHT)
+            gfx.draw_swords(surface, tx + t_surf.get_width() + 28, ty + t_surf.get_height() // 2, 14, COLOR_GOLD_LIGHT)
+
+        # Estrellas de Victoria vectoriales procedurales
+        if self.victory:
+            for s_idx in range(3):
+                sx = px + pw // 2 - 40 + s_idx * 40
+                sy = py + 105
+                gfx.draw_star(surface, sx, sy, radius=16, filled=(s_idx < self.stars))
 
         # Estadísticas
         stat_y = py + (160 if self.victory else 120)
@@ -132,16 +141,16 @@ class GameOverScene:
         btn_w, btn_h = 180, 48
         btn_y = SCREEN_HEIGHT // 2 + 155
 
-        if self.victory and self.level_data["id"] < 3:
+        if self.victory and self.level_data["id"] < len(LEVELS):
             buttons = [
-                (pygame.Rect(SCREEN_WIDTH // 2 - 290, btn_y, btn_w, btn_h), "🏰 Menú", (45, 40, 55)),
-                (pygame.Rect(SCREEN_WIDTH // 2 - 90, btn_y, btn_w, btn_h), "🔄 Reintentar", (50, 70, 45)),
-                (pygame.Rect(SCREEN_WIDTH // 2 + 110, btn_y, btn_w, btn_h), "⚔️ Siguiente", (65, 110, 50))
+                (pygame.Rect(SCREEN_WIDTH // 2 - 290, btn_y, btn_w, btn_h), "Menú", (45, 40, 55)),
+                (pygame.Rect(SCREEN_WIDTH // 2 - 90, btn_y, btn_w, btn_h), "Reintentar", (50, 70, 45)),
+                (pygame.Rect(SCREEN_WIDTH // 2 + 110, btn_y, btn_w, btn_h), "Siguiente Nivel", (65, 110, 50))
             ]
         else:
             buttons = [
-                (pygame.Rect(SCREEN_WIDTH // 2 - 200, btn_y, btn_w, btn_h), "🏰 Menú", (45, 40, 55)),
-                (pygame.Rect(SCREEN_WIDTH // 2 + 20, btn_y, btn_w, btn_h), "🔄 Reintentar", (50, 70, 45))
+                (pygame.Rect(SCREEN_WIDTH // 2 - 200, btn_y, btn_w, btn_h), "Menú", (45, 40, 55)),
+                (pygame.Rect(SCREEN_WIDTH // 2 + 20, btn_y, btn_w, btn_h), "Reintentar", (50, 70, 45))
             ]
 
         for r, txt, base_bg in buttons:

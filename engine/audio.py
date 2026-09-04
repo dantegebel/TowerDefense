@@ -14,31 +14,73 @@ class SoundEngine:
         self.sounds = {}
         self.music_channel = None
         self.music_sound = None
+        self.sample_rate = 44100
+        self.initialized = False
         
-        try:
-            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=1024)
-            pygame.mixer.set_num_channels(32)
-            self._generate_all_sounds()
-            self._generate_ambient_music()
-        except Exception as e:
-            print(f"[AudioEngine] Advertencia: No se pudo inicializar el audio ({e}). Modo silencioso activado.")
-            self.enabled = False
+        self.ensure_initialized()
 
-    def _generate_sound_from_wave(self, wave_data, sample_rate=44100):
-        """Convierte un array de numpy float32 (-1 a 1) en un pygame.mixer.Sound estéreo de 16 bits."""
-        # Limitar rango
-        wave_data = np.clip(wave_data, -1.0, 1.0)
-        # Escalar a int16
-        audio_int16 = (wave_data * 32767).astype(np.int16)
-        # Hacer estéreo si es mono
-        if audio_int16.ndim == 1:
-            stereo = np.column_stack((audio_int16, audio_int16))
+    def ensure_initialized(self):
+        """Intenta inicializar el mezclador de audio con múltiples fallbacks (44.1k, 48k, auto)."""
+        if self.initialized:
+            return True
+        
+        # Si pygame mixer no está inicializado, intentar varias configuraciones
+        if not pygame.mixer.get_init():
+            init_configs = [
+                {"frequency": 44100, "size": -16, "channels": 2, "buffer": 1024},
+                {"frequency": 48000, "size": -16, "channels": 2, "buffer": 1024},
+                {} # Configuración por defecto del sistema operativo
+            ]
+            for cfg in init_configs:
+                try:
+                    pygame.mixer.init(**cfg)
+                    break
+                except Exception:
+                    continue
+
+        mix_init = pygame.mixer.get_init()
+        if mix_init:
+            try:
+                self.sample_rate = mix_init[0]
+                pygame.mixer.set_num_channels(32)
+                self._generate_all_sounds()
+                self._generate_ambient_music()
+                self.initialized = True
+                self.enabled = True
+                return True
+            except Exception as e:
+                print(f"[AudioEngine] Error al generar sonidos: {e}")
+                self.enabled = False
+                return False
         else:
-            stereo = audio_int16
-        return pygame.sndarray.make_sound(stereo)
+            self.enabled = False
+            return False
+
+    def _generate_sound_from_wave(self, wave_data):
+        """Convierte un array de numpy float32 (-1 a 1) en un pygame.mixer.Sound adaptado a mono o estéreo."""
+        wave_data = np.clip(wave_data, -1.0, 1.0)
+        audio_int16 = (wave_data * 32767).astype(np.int16)
+        
+        mix_init = pygame.mixer.get_init()
+        channels = mix_init[2] if mix_init else 2
+        
+        if channels == 1:
+            # Modo Mono: sndarray requiere estrictamente un array 1D
+            if audio_int16.ndim > 1:
+                final_wave = np.ascontiguousarray(audio_int16[:, 0])
+            else:
+                final_wave = np.ascontiguousarray(audio_int16)
+        else:
+            # Modo Estéreo: sndarray requiere un array 2D (N, 2)
+            if audio_int16.ndim == 1:
+                final_wave = np.ascontiguousarray(np.column_stack((audio_int16, audio_int16)))
+            else:
+                final_wave = np.ascontiguousarray(audio_int16)
+                
+        return pygame.sndarray.make_sound(final_wave)
 
     def _generate_all_sounds(self):
-        sr = 44100
+        sr = self.sample_rate
         
         # 1. Disparo de arco (Bow shoot)
         duration = 0.15
@@ -178,9 +220,25 @@ class SoundEngine:
                        np.sin(2 * np.pi * (freqs * 0.5) * t) * 0.4) * np.exp(-t * 2)
         self.sounds["defeat"] = self._generate_sound_from_wave(defeat_wave * 0.7)
 
+        # 15. Salpicadura de ácido / brea (Alquimista)
+        duration = 0.25
+        t = np.linspace(0, duration, int(sr * duration), False)
+        noise = np.random.uniform(-0.6, 0.6, len(t))
+        bubble = np.sin(2 * np.pi * (350 + 200 * np.sin(40 * t)) * t)
+        env = np.exp(-t * 12)
+        self.sounds["acid_splash"] = self._generate_sound_from_wave((bubble * 0.6 + noise * 0.4) * env * 0.7)
+
+        # 16. Rayo Solar celestial (Santuario Solar)
+        duration = 0.35
+        t = np.linspace(0, duration, int(sr * duration), False)
+        laser = np.sin(2 * np.pi * (700 + 350 * np.exp(-t * 8)) * t) * 0.5
+        harm = np.sin(2 * np.pi * (1400 + 700 * np.exp(-t * 8)) * t) * 0.3
+        env = np.sin(np.pi * t / duration) ** 0.5
+        self.sounds["sun_beam"] = self._generate_sound_from_wave((laser + harm) * env * 0.6)
+
     def _generate_ambient_music(self):
         """Genera un loop musical ambiental medieval sintetizado (laúd y cuerdas suaves)."""
-        sr = 44100
+        sr = self.sample_rate
         bpm = 75
         beat_len = 60 / bpm
         total_beats = 32
@@ -190,7 +248,6 @@ class SoundEngine:
         music_wave = np.zeros_like(t_total)
         
         # Progresión armónica medieval (D menor, F mayor, C mayor, G menor / Dm)
-        # Acordes y arpegios estilo laúd medieval
         chord_freqs = [
             [146.83, 220.00, 261.63, 293.66, 349.23], # Dm
             [174.61, 220.00, 261.63, 349.23, 440.00], # F
@@ -204,17 +261,15 @@ class SoundEngine:
         for step in range(total_steps):
             bar = (step // 8) % 4
             chord = chord_freqs[bar]
-            # Patrón arpegiado
             note_idx = (step % 5 + (step // 3) % 2) % len(chord)
             freq = chord[note_idx]
             
             s_start = int(step * step_duration * sr)
-            s_len = int(step_duration * 2.5 * sr) # Con resonancia sostenida
+            s_len = int(step_duration * 2.5 * sr)
             s_end = min(s_start + s_len, len(t_total))
             actual_len = s_end - s_start
             
             t_note = np.linspace(0, actual_len / sr, actual_len, False)
-            # Timbre tipo laúd (armónicos ricos)
             note_wave = (np.sin(2 * np.pi * freq * t_note) * 0.5 +
                          np.sin(2 * np.pi * freq * 2 * t_note) * 0.25 +
                          np.sin(2 * np.pi * freq * 3 * t_note) * 0.15 +
@@ -227,6 +282,8 @@ class SoundEngine:
 
     def play(self, sound_name):
         """Reproduce un efecto de sonido."""
+        if not self.initialized:
+            self.ensure_initialized()
         if not self.enabled:
             return
         snd = self.sounds.get(sound_name)
@@ -236,10 +293,15 @@ class SoundEngine:
 
     def start_music(self):
         """Inicia la música ambiental en bucle."""
+        if not self.initialized:
+            self.ensure_initialized()
         if not self.enabled or not self.music_sound:
             return
         if self.music_channel is None:
-            self.music_channel = pygame.mixer.Channel(0)
+            try:
+                self.music_channel = pygame.mixer.Channel(0)
+            except Exception:
+                return
         self.music_sound.set_volume(self.volume_music)
         self.music_channel.play(self.music_sound, loops=-1)
 
@@ -248,6 +310,9 @@ class SoundEngine:
             self.music_channel.stop()
 
     def toggle_sound(self):
+        if not self.initialized:
+            self.ensure_initialized()
+        
         self.enabled = not self.enabled
         if not self.enabled:
             self.stop_music()

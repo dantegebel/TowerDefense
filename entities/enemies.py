@@ -37,6 +37,7 @@ class Enemy:
         self.is_boss = self.data.get("is_boss", False)
         self.is_flying = self.data.get("is_flying", False)
         self.slow_immune = self.data.get("slow_immune", False)
+        self.regen_per_sec = float(self.data.get("regen_per_sec", 0.0))
         
         # Estados
         self.alive = True
@@ -118,6 +119,10 @@ class Enemy:
             self.slow_timer -= dt
             if self.slow_timer <= 0:
                 self.slow_factor = 1.0
+
+        # Regeneración pasiva de vida
+        if self.regen_per_sec > 0 and self.hp < self.max_hp:
+            self.hp = min(self.max_hp, self.hp + self.regen_per_sec * dt)
 
         if self.stun_timer > 0:
             self.stun_timer -= dt
